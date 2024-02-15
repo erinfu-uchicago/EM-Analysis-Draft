@@ -1,0 +1,189 @@
+---
+title             : "The title"
+shorttitle        : "Title"
+
+author: 
+  - name          : "First Author"
+    affiliation   : "1"
+    corresponding : yes    # Define only one corresponding author
+    address       : "Postal address"
+    email         : "my@email.com"
+    role: # Contributorship roles (e.g., CRediT, https://credit.niso.org/)
+      - "Conceptualization"
+      - "Writing - Original Draft Preparation"
+      - "Writing - Review & Editing"
+  - name          : "Ernst-August Doelle"
+    affiliation   : "1,2"
+    role:
+      - "Writing - Review & Editing"
+      - "Supervision"
+
+affiliation:
+  - id            : "1"
+    institution   : "Wilhelm-Wundt-University"
+  - id            : "2"
+    institution   : "Konstanz Business School"
+
+authornote: |
+  Add complete departmental affiliations for each author here. Each new line herein must be indented, like this line.
+
+  Enter author note here.
+
+abstract: |
+  One or two sentences providing a **basic introduction** to the field,  comprehensible to a scientist in any discipline.
+  Two to three sentences of **more detailed background**, comprehensible  to scientists in related disciplines.
+  One sentence clearly stating the **general problem** being addressed by  this particular study.
+  One sentence summarizing the main result (with the words "**here we show**" or their equivalent).
+  Two or three sentences explaining what the **main result** reveals in direct comparison to what was thought to be the case previously, or how the  main result adds to previous knowledge.
+  One or two sentences to put the results into a more **general context**.
+  Two or three sentences to provide a **broader perspective**, readily comprehensible to a scientist in any discipline.
+  
+  <!-- https://tinyurl.com/ybremelq -->
+  
+keywords          : "keywords"
+wordcount         : "X"
+
+bibliography      : "r-references.bib"
+
+floatsintext      : no
+linenumbers       : yes
+draft             : no
+mask              : no
+
+figurelist        : no
+tablelist         : no
+footnotelist      : no
+
+classoption       : "man"
+output            : papaja::apa6_pdf
+---
+
+```{r setup, include = FALSE}
+library(tidyverse)
+library(papaja)
+library(broom)
+library(knitr)
+library(tinytex)
+library(kableExtra)
+r_refs("r-references.bib")
+```
+
+```{r Data setting}
+EM_dataset_wide <- read.csv("data/EM-Study1_Feb14.csv")
+EM_dataset_long <- EM_dataset_wide %>%
+  pivot_longer(cols = c("Surprise.Important", "Surprise.Interesting", "Surprise.Difficulty", "Surprise.Motivation", "Awe.Important", "Awe.Interesting", "Awe.Difficulty", "Awe.Motivation", "Enjoyment.Important", "Enjoyment.Interesting", "Enjoyment.Difficulty", "Enjoyment.Motivation", "Neutral.Important", "Neutral.Interesting", "Neutral.Difficulty", "Neutral.Motivation", "Fear.Important", "Fear.Interesting", "Fear.Difficulty", "Fear.Motivation", "Sadness.Important", "Sadness.Interesting", "Sadness.Difficulty", "Sadness.Motivation"), 
+               names_to = "Name", 
+               values_to = "Result") %>%
+  separate_wider_delim(Name,
+                       delim = ".",
+                       names = c("Emotion", "Measure")) %>%
+  separate_wider_delim(Result,
+                       delim = ".",
+                       names = c("Score", "Note"))
+EM_dataset_long$Child.Gender <- factor(EM_dataset_long$Child.Gender)
+EM_dataset_long$Child.Race <- factor(EM_dataset_long$Child.Race)
+EM_dataset_wide$Child.Gender <- factor(EM_dataset_wide$Child.Gender)
+EM_dataset_wide$Child.Race <- factor(EM_dataset_wide$Child.Race)
+EM_dataset_long$Score <- as.numeric(EM_dataset_long$Score)
+EM_dataset_long$Emotion <- factor(EM_dataset_long$Emotion, ordered = FALSE)
+```
+
+```{r descriptive-analysis-demographic}
+EM_dataset_wide %>%
+  summarize(mean = mean(Child.Age.In.Years),
+            median = median(Child.Age.In.Years),
+            sd = sd(Child.Age.In.Years),
+            range = diff(range(Child.Age.In.Years)))
+summary(EM_dataset_wide$Child.Gender)
+summary(EM_dataset_wide$Child.Race)
+```
+
+```{r descriptive-analysis-data}
+EM_dataset_long %>%
+  group_by(Emotion, Measure) %>%
+  summarize(mean = mean(Score),
+            sd = sd(Score)) %>%
+  kable()
+```
+
+```{r descriptive-analysis-data-plot}
+EM_dataset_long %>%
+  group_by(Emotion, Measure) %>%
+  ggplot(aes(x = factor(Emotion, levels = c("Awe", "Enjoyment", "Surprise", "Neutral", "Fear", "Sadness")), y = Score, fill = Emotion)) +
+  geom_violin() +
+  facet_wrap(.~Measure) +
+  scale_y_continuous(breaks = seq(1, 6, by = 1)) +
+  geom_point(stat = "summary", fun = "mean", color = "black", size = 2) +
+  labs(title = "Descriptive Analysis Data-Plot", x = "Emotions")
+```
+
+```{r regression-model-motivation1, include=FALSE}
+filtered_data_1 <- subset(EM_dataset_long, Measure == "Motivation")
+filtered_data_1$Emotion <- relevel(filtered_data_1$Emotion, ref = "Neutral")
+regmodel_1 <- lm(Score ~ Emotion + (1|ID), data = filtered_data_1)
+
+regression_results_1 <- tidy(regmodel_1)
+regression_table_1 <- regression_results_1 %>%
+  mutate_if(is.numeric, round, digits = 3) %>%
+  mutate_if(is.numeric, function(x) sprintf("%.3f", x)) %>%
+  kable(format = "markdown", align = "c", caption = "EM Regression Table (Emotion)")
+regression_table_1
+
+```
+
+```{r regression-model-motivation2, include=FALSE}
+EM_dataset_long$Emotion <- relevel(EM_dataset_long$Emotion, ref = "Neutral")
+regmodel_2 <- lm(Score ~ Emotion*Measure + (1|ID), data = EM_dataset_long)
+
+regression_results_2 <- tidy(regmodel_2)
+regression_table_2 <- regression_results_2 %>%
+  mutate_if(is.numeric, round, digits = 3) %>%
+  mutate_if(is.numeric, function(x) sprintf("%.3f", x)) %>%
+  kable(format = "markdown", align = "c", caption = "EM Regression Table (Emotion and Measure)")
+regression_table_2
+```
+
+``` {r #age-motivation fig.cap = "Children's Age and Learning Motivation Grouped by Emotions"}
+EM_dataset_long %>%
+  subset(Measure == "Motivation") %>%
+  group_by(Emotion) %>%
+ggplot(aes(x = Child.Age.In.Years, y = Score)) +
+  geom_smooth(method = "lm") +
+  facet_wrap(.~Emotion, scales = "free_x") +
+  scale_y_continuous(breaks = seq(1, 6, by = 1)) +
+  geom_point() +
+  labs(title = "The Relationship between Children's Age and Learning Motivation", subtitle = 'Grouped by Six Different Emotions', x = "Children's Age (in years)", y = "Motivation Levels")
+```
+
+```{r analysis-preferences}
+# Seed for random number generation
+set.seed(42)
+knitr::opts_chunk$set(cache.extra = knitr::rand_seed)
+```
+
+
+
+# Methods
+We report how we determined our sample size, all data exclusions (if any), all manipulations, and all measures in the study. <!-- 21-word solution (Simmons, Nelson & Simonsohn, 2012; retrieved from http://ssrn.com/abstract=2160588) -->
+
+## Participants
+
+## Material
+
+## Procedure
+
+## Data analysis
+We used `r cite_r("r-references.bib")` for all our analyses.
+
+
+# Results
+
+# Discussion
+
+
+\newpage
+
+# References
+
+::: {#refs custom-style="Bibliography"}
+:::

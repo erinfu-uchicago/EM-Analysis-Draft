@@ -43,6 +43,15 @@ EM_dataset_long %>%
             sd = sd(Score)) %>%
   kable()
 
+# r descriptive-analysis-data-plot
+EM_dataset_long %>%
+  group_by(Emotion, Measure) %>%
+  ggplot(aes(x = factor(Emotion, levels = c("Awe", "Enjoyment", "Surprise", "Neutral", "Fear", "Sadness")), y = Score, fill = Emotion)) +
+  geom_violin() +
+  facet_wrap(.~Measure) +
+  scale_y_continuous(breaks = seq(1, 6, by = 1)) +
+  labs(title = "Descriptive Analysis Data-Plot")
+
 # r regression-model-motivation1, include=FALSE
 filtered_data_1 <- subset(EM_dataset_long, Measure == "Motivation")
 filtered_data_1$Emotion <- relevel(filtered_data_1$Emotion, ref = "Neutral")
@@ -65,3 +74,14 @@ regression_table_2 <- regression_results_2 %>%
   mutate_if(is.numeric, function(x) sprintf("%.3f", x)) %>%
   kable(format = "markdown", align = "c", caption = "EM Regression Table (Emotion and Measure)")
 regression_table_2
+
+# r *age-motivation fig.cap = "Children's Age and Learning Motivation Grouped by Emotions"
+  EM_dataset_long %>%
+    subset(Measure == "Motivation") %>%
+    group_by(Emotion) %>%
+    ggplot(aes(x = Child.Age.In.Years, y = Score)) +
+    geom_smooth(method = "lm") +
+    facet_wrap(.~Emotion, scales = "free_x") +
+    scale_y_continuous(breaks = seq(1, 6, by = 1)) +
+    geom_point() +
+    labs(title = "The Relationship between Children's Age and Learning Motivation", subtitle = 'Grouped by Six Different Emotions', x = "Children's Age (in years)", y = "Motivation Levels")
